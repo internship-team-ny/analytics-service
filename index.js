@@ -1,10 +1,28 @@
+var port = process.env.PORT || 3000;
+
+const passport = require('passport');
+const Strategy = require('passport-http').BasicStrategy;
+const db = require('./db');
+
+passport.use(new Strategy(
+  function(username, password, cb) {
+      db.users.findByUsername(username, function(err, user) {
+      if (err) { return cb(err); }
+      if (!user) { return cb(null, false); }
+      if (user.password != password) { return cb(null, false); }
+      return cb(null, user);
+    });
+  }));
+
+
+
 const express = require('express');
 const app = express();
 const twitterSearch = require('./twitter.js').search;
 
-var port = process.env.PORT || 3000;
-
-app.get('/analyze', function(req, res){
+app.get('/analyze', passport.authenticate('basic', { session: false }),
+function(req, res) {
+  console.log("Welcome " + req.user.username);
   if(!req.query.tweetQ){
     console.log("No search param")
     res.writeHead(400, "Missing 'tweetQ' API parameter");
@@ -14,8 +32,8 @@ app.get('/analyze', function(req, res){
   twitterSearch(req.query.tweetQ)
   .then(function(tweets){
     res.json({
-      response: "Asking for: " + req.query.tweetQ,
-      size: tweets.statuses.length
+      response: req.query.tweetQuery,
+      size: tweets.statuses.length,
       tweetTexts: tweets.statuses.map(function(element){
         return {
           text: element.text,
